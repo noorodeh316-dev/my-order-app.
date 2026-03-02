@@ -1,60 +1,61 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
-# إعدادات الصفحة لتظهر بشكل احترافي
-st.set_page_config(page_title="Order Management System Pro", layout="wide")
+# إعدادات الصفحة
+st.set_page_config(page_title="Order Management System", layout="wide")
 
-st.title("🚀 Navigation Menu")
+# القائمة الجانبية
+st.sidebar.title("🚀 Navigation")
+page = st.sidebar.radio("Go to:", ["1️⃣ Sales Entry", "📊 Reports"])
 
-# القائمة الجانبية (Sidebar) للتنقل بين المراحل
-st.sidebar.title("Go to Stage:")
-page = st.sidebar.radio("Stages", [
-    "1️⃣ Stage 1: Sales Entry", 
-    "2️⃣ Stage 2: Coordination", 
-    "3️⃣ Stage 3: Quality Control (QC)", 
-    "4️⃣ Stage 4: Logistics",
-    "📊 Final Reports"
-])
-
-# الربط مع جوجل شيت (مع دعم التحديث الفوري)
-url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+# الاتصال بالجوجل شيت
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-if page == "1️⃣ Stage 1: Sales Entry":
-    st.header("Order Details")
+if page == "1️⃣ Sales Entry":
+    st.header("Order Management System Pro")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        sales_rep = st.text_input("Sales Representative Name")
-        company = st.text_input("Company Name")
-        contact = st.text_input("Customer Contact Name")
-        phone = st.text_input("Phone Number")
-    
-    with col2:
-        email = st.text_input("Email Address")
-        location = st.text_input("Customer Location (Link or Address)")
-        payment = st.selectbox("Payment Method", ["Cash", "Bank Transfer", "Credit Card"])
-        upload = st.file_uploader("Upload Attachments (LPO, License, etc.)")
-
-    description = st.text_area("Order Description & Special Requirements")
-
-    if st.button("Submit Order to Cloud"):
-        # قراءة البيانات مع دعم Unicode (لتجنب خطأ اللغة العربية)
-        try:
-            new_data = pd.DataFrame([{
-                "Sales Rep": sales_rep,
-                "Company": company,
-                "Contact": contact,
-                "Phone": phone,
-                "Description": description
-            }])
+    with st.form("main_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            sales_rep = st.text_input("Sales Representative Name")
+            company = st.text_input("Company Name")
+            contact = st.text_input("Customer Contact Name")
+            phone = st.text_input("Phone Number")
+        with col2:
+            email = st.text_input("Email Address")
+            location = st.text_input("Customer Location")
+            payment = st.selectbox("Payment Method", ["Cash", "Bank Transfer", "Credit Card"])
+            st.file_uploader("Upload Attachments")
             
-            # تحديث البيانات في الشيت
-            conn.create(spreadsheet=url, data=new_data)
-            st.success("✅ Order Submitted Successfully!")
-        except Exception as e:
-            st.error(f"Error: {e}")
+        description = st.text_area("Order Description & Special Requirements")
+        
+        # زر الإرسال
+        submit = st.form_submit_button("Submit Order to Cloud")
 
-else:
-    st.info(f"Welcome to {page}. This section is being updated.")
+        if submit:
+            if sales_rep and company:
+                # تجهيز البيانات
+                new_row = pd.DataFrame([{
+                    "Sales Rep": sales_rep,
+                    "Company": company,
+                    "Contact": contact,
+                    "Phone": phone,
+                    "Email": email,
+                    "Location": location,
+                    "Payment": payment,
+                    "Description": description
+                }])
+                
+                try:
+                    # هذه هي الطريقة السحرية: نقرأ ثم ندمج ثم نحدث
+                    existing_data = conn.read(ttl=0)
+                    updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+                    
+                    # ملاحظة: إذا ظهر خطأ الصلاحيات هنا، سنستخدم طريقة الرابط المباشر
+                    conn.update(data=updated_df)
+                    st.success("✅ مبروك! تم إرسال الطلب بنجاح.")
+                except Exception as e:
+                    st.error("عذراً، جوجل ما زال يرفض التعديل. تأكدي من ضبط الملف كـ Editor.")
+            else:
+                st.warning("الرجاء إدخال البيانات الأساسية.")
